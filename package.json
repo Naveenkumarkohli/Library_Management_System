@@ -1,0 +1,42 @@
+{
+  "name": "library-management-system",
+  "version": "1.0.0",
+  "description": "A modern, responsive web application for managing library books with advanced search, filtering, and user management capabilities.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "library",
+    "management",
+    "books",
+    "nodejs",
+    "express",
+    "ejs",
+    "responsive",
+    "ajax"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/library-management-system.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/library-management-system/issues"
+  },
+  "homepage": "https://github.com/yourusername/library-management-system#readme",
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "dependencies": {
+    "ejs": "^3.1.9",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
