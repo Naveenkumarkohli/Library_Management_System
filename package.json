@@ -18,16 +18,16 @@
     "responsive",
     "ajax"
   ],
-  "author": "Your Name",
+  "author": "Naveen Kumar Kohli",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/library-management-system.git"
+    "url": "https://github.com/Naveenkumarkohli/Library_Management_System.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/library-management-system/issues"
+    "url": "https://github.com/Naveenkumarkohli/Library_Management_System/issues"
   },
-  "homepage": "https://github.com/yourusername/library-management-system#readme",
+  "homepage": "https://github.com/Naveenkumarkohli/Library_Management_System#readme",
   "engines": {
     "node": ">=14.0.0",
     "npm": ">=6.0.0"
