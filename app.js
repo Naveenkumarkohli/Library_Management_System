@@ -99,6 +99,14 @@ function getLocalIp() {
 
 // ================= ROUTES =================
 
+// Root route - redirect to login
+app.get("/", (req, res) => {
+  if (req.session.user) {
+    return res.redirect(req.session.user.role === "admin" ? "/admin" : "/home");
+  }
+  res.redirect("/login");
+});
+
 // Login
 app.get("/login", (req, res) => res.render("login"));
 app.post("/login", async (req, res) => {
@@ -113,7 +121,7 @@ app.post("/login", async (req, res) => {
     return res.redirect("/login");
   }
   req.session.user = user;
-  res.redirect(user.role === "admin" ? "/admin" : "/");
+  res.redirect(user.role === "admin" ? "/admin" : "/home");
 });
 
 // Logout
@@ -123,7 +131,7 @@ app.get("/logout", (req, res) => {
 });
 
 // Home page
-app.get("/", isAuthenticated, async (req, res) => {
+app.get("/home", isAuthenticated, async (req, res) => {
   const books = await Book.find({});
   res.render("home", { user: req.session.user, books });
 });
@@ -197,7 +205,7 @@ app.post("/issue", isAuthenticated, async (req, res) => {
     await book.save();
     req.flash("success", `"${book.title}" has been issued to you.`);
   } else req.flash("error", "Book cannot be issued.");
-  res.redirect("/");
+  res.redirect("/home");
 });
 
 app.post("/return", isAuthenticated, async (req, res) => {
@@ -208,7 +216,7 @@ app.post("/return", isAuthenticated, async (req, res) => {
     await book.save();
     req.flash("success", `"${book.title}" has been returned successfully.`);
   } else req.flash("error", "Book cannot be returned.");
-  res.redirect("/");
+  res.redirect("/home");
 });
 
 // ================= SERVER =================
