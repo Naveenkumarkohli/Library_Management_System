@@ -147,13 +147,14 @@ app.post("/register", async (req, res) => {
   const newRequest = new Request({ username, password, email });
   await newRequest.save();
 
-  const serverIp = getLocalIp();
-  sendMail("naveenkumarkohli06@gmail.com", "New Registration Request", `
+  const serverUrl = process.env.RENDER_EXTERNAL_URL || `https://library-management-system-1.onrender.com`;
+  const adminEmail = process.env.EMAIL_USER || "naveenkumarkohli06@gmail.com";
+  sendMail(adminEmail, "New Registration Request", `
     <p>New registration request:</p>
     <p><strong>Username:</strong> ${username}</p>
     <p><strong>Email:</strong> ${email}</p>
-    <a href="http://${serverIp}:3000/approve/${newRequest._id}">✅ Approve</a> |
-    <a href="http://${serverIp}:3000/reject/${newRequest._id}">❌ Reject</a>
+    <a href="${serverUrl}/approve/${newRequest._id}">✅ Approve</a> |
+    <a href="${serverUrl}/reject/${newRequest._id}">❌ Reject</a>
   `);
 
   req.flash("success", "Registration request sent. Wait for admin approval.");
