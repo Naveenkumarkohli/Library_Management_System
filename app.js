@@ -1,240 +1,216 @@
-const express = require('express');
-const path = require('path');
+const express = require("express");
+const session = require("express-session");
+const bodyParser = require("body-parser");
+const flash = require("connect-flash");
+const nodemailer = require("nodemailer");
+const os = require("os");
+const mongoose = require("mongoose");
+
 const app = express();
-const port = 3000;
 
-// Enhanced book data with more realistic information
-let books = [
-    {
-        id: 1,
-        Name: "The Rudest Book Ever",
-        author: "Shwetabh Gangwar",
-        pages: 200,
-        price: 240,
-        state: "Available",
-        category: "Self-Help",
-        isbn: "978-0143441151",
-        publishYear: 2019,
-        description: "A brutally honest guide to life",
-        issueDate: null,
-        returnDate: null,
-        issuedTo: null
-    },
-    {
-        id: 2,
-        Name: "Do Epic Shit",
-        author: "Ankur Warikoo",
-        pages: 250,
-        price: 300,
-        state: "Available",
-        category: "Business",
-        isbn: "978-9391165239",
-        publishYear: 2021,
-        description: "Entrepreneurial wisdom and life lessons",
-        issueDate: null,
-        returnDate: null,
-        issuedTo: null
-    },
-    {
-        id: 3,
-        Name: "Atomic Habits",
-        author: "James Clear",
-        pages: 320,
-        price: 450,
-        state: "Issued",
-        category: "Self-Help",
-        isbn: "978-0735211292",
-        publishYear: 2018,
-        description: "Tiny changes, remarkable results",
-        issueDate: "2024-01-15",
-        returnDate: null,
-        issuedTo: "John Doe"
-    },
-    {
-        id: 4,
-        Name: "The Psychology of Money",
-        author: "Morgan Housel",
-        pages: 256,
-        price: 399,
-        state: "Available",
-        category: "Finance",
-        isbn: "978-0857197689",
-        publishYear: 2020,
-        description: "Timeless lessons on wealth, greed, and happiness",
-        issueDate: null,
-        returnDate: null,
-        issuedTo: null
-    }
-];
+// ================= MONGODB ATLAS CONNECTION =================
+const mongoUri = process.env.MONGODB_URI || "mongodb+srv://naveenkumarkohli06_db_user:I9qjQ90iGU8K3N1x@library-app.jvkn562.mongodb.net/libraryDB?retryWrites=true&w=majority";
+mongoose.connect(mongoUri)
+  .then(() => console.log("Connected to MongoDB Atlas"))
+  .catch(err => console.error("MongoDB connection error:", err));
 
-let nextId = 5;
-
-// Middleware
-app.set('view engine', 'ejs');
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Add CORS headers for API endpoints
-app.use('/api', (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    next();
+// ================= SCHEMAS =================
+const userSchema = new mongoose.Schema({
+  username: String,
+  password: String,
+  role: String,
+  email: String,
+  approved: Boolean,
 });
 
-// Helper function to get statistics
-function getStatistics() {
-    const total = books.length;
-    const available = books.filter(book => book.state === "Available").length;
-    const issued = books.filter(book => book.state === "Issued").length;
-    const categories = [...new Set(books.map(book => book.category))];
-    
-    return {
-        total,
-        available,
-        issued,
-        categories: categories.length
-    };
+const bookSchema = new mongoose.Schema({
+  title: String,
+  author: String,
+  category: String,
+  state: { type: String, default: "Available" },
+  issuedTo: { type: String, default: null },
+});
+
+const requestSchema = new mongoose.Schema({
+  username: String,
+  password: String,
+  email: String,
+});
+
+const User = mongoose.model("User", userSchema);
+const Book = mongoose.model("Book", bookSchema);
+const Request = mongoose.model("Request", requestSchema);
+
+// ================= MIDDLEWARE =================
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(session({ 
+  secret: process.env.SESSION_SECRET || "library-secret", 
+  resave: false, 
+  saveUninitialized: true 
+}));
+app.use(flash());
+
+app.use((req, res, next) => {
+  res.locals.success = req.flash("success") || [];
+  res.locals.error = req.flash("error") || [];
+  next();
+});
+
+app.set("view engine", "ejs");
+app.set("views", __dirname + "/views");
+
+// ================= AUTH FUNCTIONS =================
+function isAuthenticated(req, res, next) {
+  if (req.session.user) return next();
+  res.redirect("/login");
 }
 
-// Home route - display books with search and filter
-app.get("/", (req, res) => {
-    console.log("DEBUG: Home route called with enhanced version");
-    const { search, category, status } = req.query;
-    let filteredBooks = books;
+function isAdmin(req, res, next) {
+  if (req.session.user && req.session.user.role === "admin") return next();
+  res.status(403).send("Forbidden: Admins only");
+}
 
-    // Apply search filter
-    if (search) {
-        filteredBooks = filteredBooks.filter(book => 
-            book.Name.toLowerCase().includes(search.toLowerCase()) ||
-            book.author.toLowerCase().includes(search.toLowerCase()) ||
-            book.isbn.includes(search)
-        );
-    }
-
-    // Apply category filter
-    if (category && category !== 'all') {
-        filteredBooks = filteredBooks.filter(book => book.category === category);
-    }
-
-    // Apply status filter
-    if (status && status !== 'all') {
-        filteredBooks = filteredBooks.filter(book => book.state === status);
-    }
-
-    const stats = getStatistics();
-    const categories = [...new Set(books.map(book => book.category))];
-    
-    console.log("DEBUG: Stats object:", stats);
-    console.log("DEBUG: Categories:", categories);
-
-    res.render("home", { 
-        data: filteredBooks, 
-        stats,
-        categories,
-        currentSearch: search || '',
-        currentCategory: category || 'all',
-        currentStatus: status || 'all'
-    });
+// ================= MAIL CONFIG =================
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "naveenkumarkohli06@gmail.com",
+    pass: "hqzj xjhp wtca hbis", // app password
+  },
 });
 
-// Add new book
-app.post("/", (req, res) => {
-    const newbook = {
-        id: nextId++,
-        Name: req.body.Name,
-        author: req.body.author,
-        pages: Number(req.body.pages),
-        price: Number(req.body.price),
-        category: req.body.category || 'General',
-        isbn: req.body.isbn || '',
-        publishYear: Number(req.body.publishYear) || new Date().getFullYear(),
-        description: req.body.description || '',
-        state: "Available",
-        issueDate: null,
-        returnDate: null,
-        issuedTo: null
-    };
-    books.push(newbook);
-    res.redirect("/");
-});
+function sendMail(to, subject, html) {
+  transporter.sendMail({ from: "naveenkumarkohli06@gmail.com", to, subject, html }, (err, info) => {
+    if (err) console.error("Error sending email:", err);
+    else console.log("Email sent:", info.response);
+  });
+}
 
-// Issue book
-app.post("/issue", (req, res) => {
-    const bookId = Number(req.body.id);
-    const issuedTo = req.body.issuedTo || 'Unknown User';
-    
-    const book = books.find(book => book.id === bookId);
-    if (book && book.state === "Available") {
-        book.state = "Issued";
-        book.issueDate = new Date().toISOString().split('T')[0];
-        book.issuedTo = issuedTo;
+// ================= LAN IP =================
+function getLocalIp() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === "IPv4" && !net.internal) return net.address;
     }
-    res.redirect("/");
+  }
+  return "localhost";
+}
+
+// ================= ROUTES =================
+
+// Login
+app.get("/login", (req, res) => res.render("login"));
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  const user = await User.findOne({ username, password });
+  if (!user) {
+    req.flash("error", "Invalid credentials.");
+    return res.redirect("/login");
+  }
+  if (!user.approved) {
+    req.flash("error", "Account not approved yet.");
+    return res.redirect("/login");
+  }
+  req.session.user = user;
+  res.redirect(user.role === "admin" ? "/admin" : "/");
 });
 
-// Return book
-app.post("/return", (req, res) => {
-    const bookId = Number(req.body.id);
-    
-    const book = books.find(book => book.id === bookId);
-    if (book && book.state === "Issued") {
-        book.state = "Available";
-        book.returnDate = new Date().toISOString().split('T')[0];
-        book.issuedTo = null;
-    }
-    res.redirect("/");
+// Logout
+app.get("/logout", (req, res) => {
+  req.session.destroy();
+  res.redirect("/login");
 });
 
-// Delete book
-app.post("/delete", (req, res) => {
-    const bookId = Number(req.body.id);
-    books = books.filter(book => book.id !== bookId);
-    res.redirect("/");
+// Home page
+app.get("/", isAuthenticated, async (req, res) => {
+  const books = await Book.find({});
+  res.render("home", { user: req.session.user, books });
 });
 
-// API endpoint for statistics (for future AJAX calls)
-app.get("/api/stats", (req, res) => {
-    res.json(getStatistics());
+// Registration
+app.get("/register", (req, res) => res.render("register"));
+app.post("/register", async (req, res) => {
+  const { username, password, email } = req.body;
+  if (await User.findOne({ username }) || await Request.findOne({ username })) {
+    req.flash("error", "Username already taken or pending approval.");
+    return res.redirect("/register");
+  }
+  const newRequest = new Request({ username, password, email });
+  await newRequest.save();
+
+  const serverIp = getLocalIp();
+  sendMail("naveenkumarkohli06@gmail.com", "New Registration Request", `
+    <p>New registration request:</p>
+    <p><strong>Username:</strong> ${username}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    <a href="http://${serverIp}:3000/approve/${newRequest._id}">✅ Approve</a> |
+    <a href="http://${serverIp}:3000/reject/${newRequest._id}">❌ Reject</a>
+  `);
+
+  req.flash("success", "Registration request sent. Wait for admin approval.");
+  res.redirect("/login");
 });
 
-// API endpoint for filtered books (AJAX)
-app.get("/api/books", (req, res) => {
-    const { search, category, status } = req.query;
-    let filteredBooks = books;
-
-    // Apply search filter
-    if (search) {
-        filteredBooks = filteredBooks.filter(book => 
-            book.Name.toLowerCase().includes(search.toLowerCase()) ||
-            book.author.toLowerCase().includes(search.toLowerCase()) ||
-            book.isbn.includes(search)
-        );
-    }
-
-    // Apply category filter
-    if (category && category !== 'all') {
-        filteredBooks = filteredBooks.filter(book => book.category === category);
-    }
-
-    // Apply status filter
-    if (status && status !== 'all') {
-        filteredBooks = filteredBooks.filter(book => book.state === status);
-    }
-
-    const stats = getStatistics();
-    const categories = [...new Set(books.map(book => book.category))];
-
-    res.json({
-        books: filteredBooks,
-        stats,
-        categories,
-        totalFound: filteredBooks.length
-    });
+// Admin dashboard
+app.get("/admin", isAuthenticated, isAdmin, async (req, res) => {
+  const books = await Book.find({});
+  const users = await User.find({});
+  const pendingRequests = await Request.find({});
+  res.render("admin", { user: req.session.user, books, users, pendingRequests });
 });
 
-app.listen(port, () => {
-    console.log(`🚀 Library Management System running on http://localhost:${port}`);
-    console.log(`📚 Managing ${books.length} books across ${[...new Set(books.map(b => b.category))].length} categories`);
+// Approve / Reject requests
+app.get("/approve/:id", async (req, res) => {
+  const request = await Request.findById(req.params.id);
+  if (request) {
+    await new User({
+      username: request.username,
+      password: request.password,
+      role: "user",
+      email: request.email,
+      approved: true
+    }).save();
+    await Request.findByIdAndDelete(req.params.id);
+    sendMail(request.email, "Library Approval", "✅ Your account has been approved. You can now log in.");
+    req.flash("success", `User "${request.username}" approved.`);
+  } else req.flash("error", "Request not found.");
+  res.redirect("/login");
 });
+
+app.get("/reject/:id", async (req, res) => {
+  const request = await Request.findById(req.params.id);
+  if (request) {
+    sendMail(request.email, "Library Rejection", "❌ Your account request has been rejected.");
+    await Request.findByIdAndDelete(req.params.id);
+    req.flash("error", `User "${request.username}" rejected.`);
+  }
+  res.redirect("/login");
+});
+
+// Issue & Return Books
+app.post("/issue", isAuthenticated, async (req, res) => {
+  const book = await Book.findById(req.body.id);
+  if (book && book.state === "Available") {
+    book.state = "Issued";
+    book.issuedTo = req.session.user.username;
+    await book.save();
+    req.flash("success", `"${book.title}" has been issued to you.`);
+  } else req.flash("error", "Book cannot be issued.");
+  res.redirect("/");
+});
+
+app.post("/return", isAuthenticated, async (req, res) => {
+  const book = await Book.findById(req.body.id);
+  if (book && book.state === "Issued" && book.issuedTo === req.session.user.username) {
+    book.state = "Available";
+    book.issuedTo = null;
+    await book.save();
+    req.flash("success", `"${book.title}" has been returned successfully.`);
+  } else req.flash("error", "Book cannot be returned.");
+  res.redirect("/");
+});
+
+// ================= SERVER =================
+const PORT = 3000;
+app.listen(PORT, () => console.log(`Server running at http://${getLocalIp()}:${PORT}`));
