@@ -74,13 +74,14 @@ function isAdmin(req, res, next) {
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "naveenkumarkohli06@gmail.com",
-    pass: "hqzj xjhp wtca hbis", // app password
+    user: process.env.EMAIL_USER || "naveenkumarkohli06@gmail.com",
+    pass: process.env.EMAIL_PASS || "hqzj xjhp wtca hbis", // app password
   },
 });
 
 function sendMail(to, subject, html) {
-  transporter.sendMail({ from: "naveenkumarkohli06@gmail.com", to, subject, html }, (err, info) => {
+  const fromEmail = process.env.EMAIL_USER || "naveenkumarkohli06@gmail.com";
+  transporter.sendMail({ from: fromEmail, to, subject, html }, (err, info) => {
     if (err) console.error("Error sending email:", err);
     else console.log("Email sent:", info.response);
   });
@@ -171,30 +172,59 @@ app.get("/admin", isAuthenticated, isAdmin, async (req, res) => {
 
 // Approve / Reject requests
 app.get("/approve/:id", async (req, res) => {
-  const request = await Request.findById(req.params.id);
-  if (request) {
-    await new User({
-      username: request.username,
-      password: request.password,
-      role: "user",
-      email: request.email,
-      approved: true
-    }).save();
-    await Request.findByIdAndDelete(req.params.id);
-    sendMail(request.email, "Library Approval", "✅ Your account has been approved. You can now log in.");
-    req.flash("success", `User "${request.username}" approved.`);
-  } else req.flash("error", "Request not found.");
-  res.redirect("/login");
+  try {
+    const request = await Request.findById(req.params.id);
+    if (request) {
+      await new User({
+        username: request.username,
+        password: request.password,
+        role: "user",
+        email: request.email,
+        approved: true
+      }).save();
+      await Request.findByIdAndDelete(req.params.id);
+      sendMail(request.email, "Library Approval", "✅ Your account has been approved. You can now log in.");
+      req.flash("success", `User "${request.username}" approved successfully.`);
+    } else {
+      req.flash("error", "Request not found or already processed.");
+    }
+  } catch (error) {
+    console.error("Approval error:", error);
+    req.flash("error", "An error occurred while processing the approval.");
+  }
+  res.redirect("/approval-success");
 });
 
 app.get("/reject/:id", async (req, res) => {
-  const request = await Request.findById(req.params.id);
-  if (request) {
-    sendMail(request.email, "Library Rejection", "❌ Your account request has been rejected.");
-    await Request.findByIdAndDelete(req.params.id);
-    req.flash("error", `User "${request.username}" rejected.`);
+  try {
+    const request = await Request.findById(req.params.id);
+    if (request) {
+      sendMail(request.email, "Library Rejection", "❌ Your account request has been rejected.");
+      await Request.findByIdAndDelete(req.params.id);
+      req.flash("success", `User "${request.username}" rejected successfully.`);
+    } else {
+      req.flash("error", "Request not found or already processed.");
+    }
+  } catch (error) {
+    console.error("Rejection error:", error);
+    req.flash("error", "An error occurred while processing the rejection.");
   }
-  res.redirect("/login");
+  res.redirect("/approval-success");
+});
+
+// Success page for approvals/rejections
+app.get("/approval-success", (req, res) => {
+  res.send(`
+    <html>
+      <head><title>Library Management - Action Complete</title></head>
+      <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+        <h2>Action Completed Successfully</h2>
+        <p>The user registration request has been processed.</p>
+        <p>An email notification has been sent to the user.</p>
+        <a href="/login" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Login</a>
+      </body>
+    </html>
+  `);
 });
 
 // Issue & Return Books
@@ -221,5 +251,5 @@ app.post("/return", isAuthenticated, async (req, res) => {
 });
 
 // ================= SERVER =================
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running at http://${getLocalIp()}:${PORT}`));
