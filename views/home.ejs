@@ -84,7 +84,7 @@
       transition: transform 0.2s; 
       display: flex; 
       flex-direction: column; 
-      min-height: 220px;
+      height: 220px;
     }
     .book-card:hover { transform: translateY(-5px); }
     .book-card h3 { 
@@ -95,14 +95,16 @@
       align-items: center; 
       gap: 10px; 
       margin-bottom: 10px;
-    }
-    .book-card h3 i { 
-      font-size: 1.5rem; 
-      color: #667eea; 
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .book-card p { 
       margin: 4px 0; 
       color: #666; 
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .book-card p strong { 
       color: #333; 
