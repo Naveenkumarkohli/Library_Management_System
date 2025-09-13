@@ -75,7 +75,7 @@
     
     /* Books Section */
     .books-section { margin-bottom: 30px; }
-    .books-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .books-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; max-width: 1200px; margin: 0 auto; }
     .book-card { 
       background: white; 
       padding: 25px; 
@@ -84,6 +84,7 @@
       transition: transform 0.2s; 
       display: flex; 
       flex-direction: column; 
+      min-height: 300px;
     }
     .book-card:hover { transform: translateY(-5px); }
     .book-card h3 { 
@@ -119,7 +120,7 @@
     .book-actions { 
       display: flex; 
       gap: 10px; 
-      margin-top: 20px; 
+      margin-top: auto; 
     }
     .btn-issue { 
       background: #28a745; 
@@ -143,6 +144,49 @@
       flex: 1;
     }
     .btn-return:hover { background: #0056b3; }
+    
+    /* Pagination Styles for Home Page */
+    .pagination-container { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-top: 30px; 
+      padding: 20px; 
+      background: white; 
+      border-radius: 16px; 
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+    }
+    .pagination-left { display: flex; align-items: center; gap: 10px; }
+    .pagination-left label { font-weight: 600; color: #4a5568; }
+    .pagination-left select { padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #f7fafc; }
+    .pagination-center { display: flex; align-items: center; gap: 8px; }
+    .pagination-btn { 
+      padding: 8px 12px; 
+      border: 2px solid #e2e8f0; 
+      background: white; 
+      color: #4a5568; 
+      text-decoration: none; 
+      border-radius: 8px; 
+      font-weight: 500; 
+      transition: all 0.2s;
+    }
+    .pagination-btn:hover { background: #f7fafc; border-color: #cbd5e0; text-decoration: none; color: #4a5568; }
+    .pagination-btn.active { background: #667eea; color: white; border-color: #667eea; }
+    .pagination-btn.disabled { opacity: 0.5; pointer-events: none; }
+    .pagination-right { display: flex; align-items: center; gap: 10px; }
+    .pagination-right input { padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 60px; text-align: center; background: #f7fafc; }
+    .pagination-right button { 
+      padding: 8px 16px; 
+      background: #667eea; 
+      color: white; 
+      border: none; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      font-weight: 600; 
+      transition: all 0.2s;
+    }
+    .pagination-right button:hover { background: #5a6fd8; transform: translateY(-1px); }
+    
     .empty-state { text-align: center; padding: 60px 20px; color: #a0aec0; }
     .empty-state i { font-size: 4rem; margin-bottom: 20px; }
     .empty-state h3 { margin: 0 0 10px 0; color: #4a5568; }
@@ -304,7 +348,7 @@
         
         <div class="results-info">
           <div class="results-count">
-            Showing <span id="visibleCount"><%= books.length %></span> of <span id="totalCount"><%= books.length %></span> books
+            Showing <span id="visibleCount"><%= books.length %></span> of <span id="totalCount"><%= totalRecords || books.length %></span> books
           </div>
         </div>
       </div>
@@ -313,40 +357,86 @@
       <div class="books-section">
         <h2 class="section-title"><i class="fas fa-books"></i> Library Collection</h2>
         
-        <div class="books-grid" id="booksContainer">
-          <% books.forEach(book => { %>
-            <div class="book-card" data-title="<%= book.title.toLowerCase() %>" data-author="<%= book.author.toLowerCase() %>" data-category="<%= book.category %>" data-status="<%= book.state %>" data-issued-to="<%= book.issuedTo || '' %>">
-              <h3><i class="fas fa-book"></i> <%= book.title %></h3>
-              <p><strong>Author:</strong> <%= book.author %></p>
-              <p><strong>Category:</strong> <%= book.category %></p>
-              <p><strong>Status:</strong> 
-                <span class="status-badge <%= book.state === 'Available' ? 'status-available' : 'status-issued' %>">
-                  <%= book.state %>
-                </span>
-              </p>
-              <% if (book.state === 'Issued' && book.issuedTo && book.issuedTo !== user.username) { %>
-                <p><strong>Issued To:</strong> <%= book.issuedTo %></p>
-              <% } %>
-              <div class="book-actions">
-                <% if (book.state === 'Available') { %>
-                  <form action="/issue" method="post" onsubmit="saveScrollPosition()" style="display: inline;">
-                    <input type="hidden" name="id" value="<%= book._id %>">
-                    <button type="submit" class="btn-issue">
-                      <i class="fas fa-download"></i> Issue
-                    </button>
-                  </form>
-                <% } else if (book.state === 'Issued' && book.issuedTo === user.username) { %>
-                  <form action="/return" method="post" onsubmit="saveScrollPosition()" style="display: inline;">
-                    <input type="hidden" name="id" value="<%= book._id %>">
-                    <button type="submit" class="btn-return">
-                      <i class="fas fa-upload"></i> Return
-                    </button>
-                  </form>
+        <% if (books.length > 0) { %>
+          <div class="books-grid" id="booksContainer">
+            <% books.forEach(book => { %>
+              <div class="book-card" data-title="<%= book.title.toLowerCase() %>" data-author="<%= book.author.toLowerCase() %>" data-category="<%= book.category %>" data-status="<%= book.state %>" data-issued-to="<%= book.issuedTo || '' %>">
+                <h3><i class="fas fa-book"></i> <%= book.title %></h3>
+                <p><strong>Author:</strong> <%= book.author %></p>
+                <p><strong>Category:</strong> <%= book.category %></p>
+                <p><strong>Status:</strong> 
+                  <span class="status-badge <%= book.state === 'Available' ? 'status-available' : 'status-issued' %>">
+                    <%= book.state %>
+                  </span>
+                </p>
+                <% if (book.state === 'Issued' && book.issuedTo && book.issuedTo !== user.username) { %>
+                  <p><strong>Issued To:</strong> <%= book.issuedTo %></p>
                 <% } %>
+                <div class="book-actions">
+                  <% if (book.state === 'Available') { %>
+                    <form action="/issue" method="post" onsubmit="saveScrollPosition()" style="display: inline;">
+                      <input type="hidden" name="id" value="<%= book._id %>">
+                      <button type="submit" class="btn-issue">
+                        <i class="fas fa-download"></i> Issue
+                      </button>
+                    </form>
+                  <% } else if (book.state === 'Issued' && book.issuedTo === user.username) { %>
+                    <form action="/return" method="post" onsubmit="saveScrollPosition()" style="display: inline;">
+                      <input type="hidden" name="id" value="<%= book._id %>">
+                      <button type="submit" class="btn-return">
+                        <i class="fas fa-upload"></i> Return
+                      </button>
+                    </form>
+                  <% } %>
+                </div>
               </div>
+            <% }) %>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div class="pagination-container">
+            <div class="pagination-left">
+              <label>Books Per Page:</label>
+              <select id="recordsPerPage" onchange="changeRecordsPerPage()">
+                <option value="3" <%= (recordsPerPage || 3) == 3 ? 'selected' : '' %>>3</option>
+                <option value="6" <%= (recordsPerPage || 3) == 6 ? 'selected' : '' %>>6</option>
+                <option value="9" <%= (recordsPerPage || 3) == 9 ? 'selected' : '' %>>9</option>
+                <option value="12" <%= (recordsPerPage || 3) == 12 ? 'selected' : '' %>>12</option>
+              </select>
             </div>
-          <% }) %>
-        </div>
+            
+            <div class="pagination-center">
+              <% if (currentPage > 1) { %>
+                <a href="?page=<%= currentPage - 1 %>&limit=<%= recordsPerPage || 3 %>" class="pagination-btn">← Prev</a>
+              <% } else { %>
+                <span class="pagination-btn disabled">← Prev</span>
+              <% } %>
+              
+              <% for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) { %>
+                <a href="?page=<%= i %>&limit=<%= recordsPerPage || 3 %>" 
+                   class="pagination-btn <%= i === currentPage ? 'active' : '' %>"><%= i %></a>
+              <% } %>
+              
+              <% if (currentPage < totalPages) { %>
+                <a href="?page=<%= currentPage + 1 %>&limit=<%= recordsPerPage || 3 %>" class="pagination-btn">Next →</a>
+              <% } else { %>
+                <span class="pagination-btn disabled">Next →</span>
+              <% } %>
+            </div>
+            
+            <div class="pagination-right">
+              <label>Go to:</label>
+              <input type="number" id="gotoPage" min="1" max="<%= totalPages %>" placeholder="<%= currentPage %>">
+              <button onclick="gotoPage()">Go</button>
+            </div>
+          </div>
+        <% } else { %>
+          <div class="empty-state">
+            <i class="fas fa-book"></i>
+            <h3>No books available</h3>
+            <p>Check back later for new additions to our library collection.</p>
+          </div>
+        <% } %>
         
         <div id="noResults" class="empty-state" style="display: none;">
           <i class="fas fa-search"></i>
@@ -358,7 +448,24 @@
   </div>
 
   <script>
-    // Search and Filter Functionality
+    // Pagination Functions
+    function changeRecordsPerPage() {
+      const recordsPerPage = document.getElementById('recordsPerPage').value;
+      const urlParams = new URLSearchParams(window.location.search);
+      urlParams.set('limit', recordsPerPage);
+      urlParams.set('page', '1');
+      window.location.search = urlParams.toString();
+    }
+    
+    function gotoPage() {
+      const page = document.getElementById('gotoPage').value;
+      const recordsPerPage = document.getElementById('recordsPerPage').value;
+      if (page && page >= 1 && page <= <%= totalPages || 1 %>) {
+        window.location.href = `?page=${page}&limit=${recordsPerPage}`;
+      }
+    }
+
+    // Search and Filter Functionality (now works with pagination)
     function filterBooks() {
       const searchTerm = document.getElementById('searchInput').value.toLowerCase();
       const categoryFilter = document.getElementById('categoryFilter').value;
@@ -442,7 +549,7 @@
       }
       
       // Update counters
-      const totalBooks = bookCards.length;
+      const totalBooks = <%= totalRecords || books.length %>;
       const visibleCount = visibleBooks.length;
       
       document.getElementById('visibleCount').textContent = visibleCount;
@@ -471,14 +578,18 @@
     }
 
     // Event listeners
-    document.getElementById('searchInput').addEventListener('input', filterBooks);
-    document.getElementById('categoryFilter').addEventListener('change', filterBooks);
-    document.getElementById('statusFilter').addEventListener('change', filterBooks);
-    document.getElementById('sortFilter').addEventListener('change', filterBooks);
+    <% if (user.role !== 'admin') { %>
+      document.getElementById('searchInput').addEventListener('input', filterBooks);
+      document.getElementById('categoryFilter').addEventListener('change', filterBooks);
+      document.getElementById('statusFilter').addEventListener('change', filterBooks);
+      document.getElementById('sortFilter').addEventListener('change', filterBooks);
+    <% } %>
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
-      filterBooks();
+      <% if (user.role !== 'admin') { %>
+        filterBooks();
+      <% } %>
       const scrollPosition = document.cookie.match(/scrollPosition=([^;]*)/);
       if (scrollPosition) {
         window.scrollTo(0, parseInt(scrollPosition[1]));

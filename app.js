@@ -165,34 +165,82 @@ app.get("/logout", (req, res) => {
 
 // Home page
 app.get("/home", isAuthenticated, async (req, res) => {
-  const books = await Book.find({});
-  
-  if (req.session.user.role === "admin") {
-    // Admin stats
-    const stats = {
-      totalBooks: await Book.countDocuments({}),
-      availableBooks: await Book.countDocuments({ state: "Available" }),
-      issuedBooks: await Book.countDocuments({ state: "Issued" }),
-      totalUsers: await User.countDocuments({}),
-      pendingRequests: await Request.countDocuments({})
-    };
-    res.render("home", { user: req.session.user, books, stats });
-  } else {
-    // Regular user stats
-    const username = req.session.user.username;
-    const currentlyIssued = await Book.countDocuments({ issuedTo: username });
-    const totalIssued = await UserActivity.countDocuments({ username, action: 'issued' });
-    const totalReturned = await UserActivity.countDocuments({ username, action: 'returned' });
-    const returnRate = totalIssued > 0 ? Math.round((totalReturned / totalIssued) * 100) : 0;
+  try {
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 3; // Show 3 books per page in one row
+    const skip = (page - 1) * limit;
     
-    const userStats = {
-      currentlyIssued,
-      totalIssued,
-      totalReturned,
-      returnRate
-    };
+    // Get paginated books
+    const books = await Book.find({})
+      .skip(skip)
+      .limit(limit)
+      .sort({ _id: -1 }); // Sort by newest first
     
-    res.render("home", { user: req.session.user, books, userStats });
+    // Get total books count for pagination
+    const totalBooks = await Book.countDocuments();
+    const totalPages = Math.ceil(totalBooks / limit);
+    
+    if (req.session.user.role === "admin") {
+      // Admin stats
+      const stats = {
+        totalBooks: await Book.countDocuments({}),
+        availableBooks: await Book.countDocuments({ state: "Available" }),
+        issuedBooks: await Book.countDocuments({ state: "Issued" }),
+        totalUsers: await User.countDocuments({}),
+        pendingRequests: await Request.countDocuments({})
+      };
+      
+      const paginationData = {
+        currentPage: page,
+        totalPages,
+        recordsPerPage: limit,
+        totalRecords: totalBooks
+      };
+      
+      res.render("home", { 
+        user: req.session.user, 
+        books, 
+        stats,
+        ...paginationData,
+        success: req.flash("success"),
+        error: req.flash("error")
+      });
+    } else {
+      // Regular user stats
+      const username = req.session.user.username;
+      const currentlyIssued = await Book.countDocuments({ issuedTo: username });
+      const totalIssued = await UserActivity.countDocuments({ username, action: 'issued' });
+      const totalReturned = await UserActivity.countDocuments({ username, action: 'returned' });
+      const returnRate = totalIssued > 0 ? Math.round((totalReturned / totalIssued) * 100) : 0;
+      
+      const userStats = {
+        currentlyIssued,
+        totalIssued,
+        totalReturned,
+        returnRate
+      };
+      
+      const paginationData = {
+        currentPage: page,
+        totalPages,
+        recordsPerPage: limit,
+        totalRecords: totalBooks
+      };
+      
+      res.render("home", { 
+        user: req.session.user, 
+        books, 
+        userStats,
+        ...paginationData,
+        success: req.flash("success"),
+        error: req.flash("error")
+      });
+    }
+  } catch (error) {
+    console.error("Error loading home page:", error);
+    req.flash("error", "Error loading books.");
+    res.redirect("/login");
   }
 });
 
@@ -342,13 +390,47 @@ app.post("/return", isAuthenticated, async (req, res) => {
 
 // Admin Books Management
 app.get("/admin/books", isAuthenticated, isAdmin, async (req, res) => {
-  const books = await Book.find({});
-  const totalBooks = await Book.countDocuments();
-  const issuedBooks = await Book.countDocuments({ state: "Issued" });
-  const availableBooks = await Book.countDocuments({ state: "Available" });
-  
-  const stats = { totalBooks, issuedBooks, availableBooks };
-  res.render("books", { user: req.session.user, books, stats });
+  try {
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 3; // Show 3 books per page in one row
+    const skip = (page - 1) * limit;
+    
+    // Get paginated books
+    const books = await Book.find({})
+      .skip(skip)
+      .limit(limit)
+      .sort({ _id: -1 }); // Sort by newest first
+    
+    // Get stats
+    const totalBooks = await Book.countDocuments();
+    const issuedBooks = await Book.countDocuments({ state: "Issued" });
+    const availableBooks = await Book.countDocuments({ state: "Available" });
+    
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalBooks / limit);
+    
+    const stats = { totalBooks, issuedBooks, availableBooks };
+    const paginationData = {
+      currentPage: page,
+      totalPages,
+      recordsPerPage: limit,
+      totalRecords: totalBooks
+    };
+    
+    res.render("books", { 
+      user: req.session.user, 
+      books, 
+      stats,
+      ...paginationData,
+      success: req.flash("success"),
+      error: req.flash("error")
+    });
+  } catch (error) {
+    console.error("Error fetching books:", error);
+    req.flash("error", "Error loading books.");
+    res.redirect("/admin");
+  }
 });
 
 app.post("/admin/addBook", isAuthenticated, isAdmin, async (req, res) => {
@@ -405,69 +487,71 @@ app.post("/admin/addUser", isAuthenticated, isAdmin, async (req, res) => {
 });
 
 app.post("/admin/deleteUser", isAuthenticated, isAdmin, async (req, res) => {
+  const { id } = req.body;
   try {
-    const user = await User.findById(req.body.id);
-    if (!user) {
+    const userToDelete = await User.findById(id);
+    if (!userToDelete) {
       req.flash("error", "User not found.");
-      return res.redirect("/admin/users");
+    } else {
+      // Add to suspended users list
+      const suspendedUser = new SuspendedUser({
+        username: userToDelete.username,
+        email: userToDelete.email
+      });
+      await suspendedUser.save();
+      
+      await User.findByIdAndDelete(id);
+      req.flash("success", `User "${userToDelete.username}" deleted successfully.`);
     }
-
-    // Prevent deleting the last admin
-    if (user.role === "admin") {
-      const adminCount = await User.countDocuments({ role: "admin" });
-      if (adminCount <= 1) {
-        req.flash("error", "Cannot delete the last administrator.");
-        return res.redirect("/admin/users");
-      }
-    }
-
-    // Add to suspended users list
-    const suspendedUser = new SuspendedUser({
-      username: user.username,
-      email: user.email,
-      reason: "Account deleted by admin"
-    });
-    await suspendedUser.save();
-
-    // Delete the user
-    await User.findByIdAndDelete(req.body.id);
-    
-    req.flash("success", `User "${user.username}" has been deleted and suspended from rejoining.`);
   } catch (error) {
-    console.error("Delete user error:", error);
     req.flash("error", "Error deleting user.");
   }
   res.redirect("/admin/users");
 });
 
-// User Stats Page
-app.get("/admin/user-stats", isAuthenticated, isAdmin, async (req, res) => {
-  const users = await User.find({ role: "user" });
-  
-  // Get user activity stats
-  const userStats = await Promise.all(
-    users.map(async (user) => {
-      const issuedBooks = await Book.countDocuments({ issuedTo: user.username });
-      const totalIssued = await UserActivity.countDocuments({ username: user.username, action: 'issued' });
-      const totalReturned = await UserActivity.countDocuments({ username: user.username, action: 'returned' });
-      
-      // Get recent activity
-      const recentActivity = await UserActivity.find({ username: user.username })
-        .sort({ timestamp: -1 })
-        .limit(5)
-        .populate('bookId');
-      
-      return {
-        ...user.toObject(),
-        currentlyIssued: issuedBooks,
-        totalIssued,
-        totalReturned,
-        recentActivity
-      };
-    })
-  );
-  
-  res.render("user-stats", { user: req.session.user, userStats });
+// API endpoint for user statistics
+app.get("/admin/user-stats/:userId", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
+    }
+    
+    // Calculate user statistics
+    const currentlyIssued = await Book.countDocuments({ issuedTo: user.username });
+    const totalIssued = await UserActivity.countDocuments({ username: user.username, action: 'issued' });
+    const totalReturned = await UserActivity.countDocuments({ username: user.username, action: 'returned' });
+    const returnRate = totalIssued > 0 ? Math.round((totalReturned / totalIssued) * 100) : 0;
+    
+    // Get recent activity (last 5 activities)
+    const recentActivity = await UserActivity.find({ username: user.username })
+      .sort({ timestamp: -1 })
+      .limit(5)
+      .lean();
+    
+    const stats = {
+      currentlyIssued,
+      totalIssued,
+      totalReturned,
+      returnRate
+    };
+    
+    res.json({ 
+      success: true, 
+      stats, 
+      recentActivity: recentActivity.map(activity => ({
+        action: activity.action.charAt(0).toUpperCase() + activity.action.slice(1),
+        bookTitle: activity.bookTitle,
+        date: activity.timestamp
+      }))
+    });
+    
+  } catch (error) {
+    console.error("Error fetching user stats:", error);
+    res.json({ success: false, message: "Error loading user statistics" });
+  }
 });
 
 // Forgot Password Routes
