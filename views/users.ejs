@@ -273,12 +273,6 @@
                 </td>
                 <td>
                   <div class="action-buttons">
-                    <a href="#" class="action-btn btn-view" title="View" onclick="event.stopPropagation()">
-                      <i class="fas fa-eye"></i>
-                    </a>
-                    <a href="#" class="action-btn btn-edit" title="Edit" onclick="event.stopPropagation()">
-                      <i class="fas fa-edit"></i>
-                    </a>
                     <% if (user.role !== 'admin' || users.filter(u => u.role === 'admin').length > 1) { %>
                       <form action="/admin/deleteUser" method="post" style="display: inline;" onclick="event.stopPropagation()">
                         <input type="hidden" name="id" value="<%= user._id %>">
