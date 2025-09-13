@@ -350,7 +350,7 @@
         
         <div class="results-info">
           <div class="results-count">
-            Showing <span id="visibleCount"><%= books.length %></span> of <span id="totalCount"><%= totalRecords || books.length %></span> books
+            Showing <span id="visibleCount">0</span> of <span id="totalCount">0</span> books
           </div>
         </div>
       </div>
@@ -359,86 +359,28 @@
       <div class="books-section">
         <h2 class="section-title"><i class="fas fa-books"></i> Library Collection</h2>
         
-        <% if (books.length > 0) { %>
-          <div class="books-grid" id="booksContainer">
-            <% books.forEach(book => { %>
-              <div class="book-card" data-title="<%= book.title.toLowerCase() %>" data-author="<%= book.author.toLowerCase() %>" data-category="<%= book.category %>" data-status="<%= book.state %>" data-issued-to="<%= book.issuedTo || '' %>">
-                <h3><i class="fas fa-book"></i> <%= book.title %></h3>
-                <p><strong>Author:</strong> <%= book.author %></p>
-                <p><strong>Category:</strong> <%= book.category %></p>
-                <p><strong>Status:</strong> 
-                  <span class="status-badge <%= book.state === 'Available' ? 'status-available' : 'status-issued' %>">
-                    <%= book.state %>
-                  </span>
-                </p>
-                <% if (book.state === 'Issued' && book.issuedTo && book.issuedTo !== user.username) { %>
-                  <p><strong>Issued To:</strong> <%= book.issuedTo %></p>
-                <% } %>
-                <div class="book-actions">
-                  <% if (book.state === 'Available') { %>
-                    <form action="/issue" method="post" onsubmit="saveScrollPosition()" style="display: inline;">
-                      <input type="hidden" name="id" value="<%= book._id %>">
-                      <button type="submit" class="btn-issue">
-                        <i class="fas fa-download"></i> Issue
-                      </button>
-                    </form>
-                  <% } else if (book.state === 'Issued' && book.issuedTo === user.username) { %>
-                    <form action="/return" method="post" onsubmit="saveScrollPosition()" style="display: inline;">
-                      <input type="hidden" name="id" value="<%= book._id %>">
-                      <button type="submit" class="btn-return">
-                        <i class="fas fa-upload"></i> Return
-                      </button>
-                    </form>
-                  <% } %>
-                </div>
-              </div>
-            <% }) %>
-          </div>
+        <div id="booksContainer" class="books-grid"></div>
 
-          <!-- Pagination Controls -->
-          <div class="pagination-container">
-            <div class="pagination-left">
-              <label>Books Per Page:</label>
-              <select id="recordsPerPage" onchange="changeRecordsPerPage()">
-                <option value="3" <%= (recordsPerPage || 3) == 3 ? 'selected' : '' %>>3</option>
-                <option value="6" <%= (recordsPerPage || 3) == 6 ? 'selected' : '' %>>6</option>
-                <option value="9" <%= (recordsPerPage || 3) == 9 ? 'selected' : '' %>>9</option>
-                <option value="12" <%= (recordsPerPage || 3) == 12 ? 'selected' : '' %>>12</option>
-              </select>
-            </div>
-            
-            <div class="pagination-center">
-              <% if (currentPage > 1) { %>
-                <a href="?page=<%= currentPage - 1 %>&limit=<%= recordsPerPage || 3 %>" class="pagination-btn">← Prev</a>
-              <% } else { %>
-                <span class="pagination-btn disabled">← Prev</span>
-              <% } %>
-              
-              <% for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) { %>
-                <a href="?page=<%= i %>&limit=<%= recordsPerPage || 3 %>" 
-                   class="pagination-btn <%= i === currentPage ? 'active' : '' %>"><%= i %></a>
-              <% } %>
-              
-              <% if (currentPage < totalPages) { %>
-                <a href="?page=<%= currentPage + 1 %>&limit=<%= recordsPerPage || 3 %>" class="pagination-btn">Next →</a>
-              <% } else { %>
-                <span class="pagination-btn disabled">Next →</span>
-              <% } %>
-            </div>
-            
-            <div class="pagination-right">
-              <label>Go to:</label>
-              <input type="number" id="gotoPage" min="1" max="<%= totalPages %>" placeholder="<%= currentPage %>">
-              <button onclick="gotoPage()">Go</button>
-            </div>
+        <!-- Pagination Controls -->
+        <div class="pagination-container">
+          <div class="pagination-left">
+            <label>Books Per Page:</label>
+            <select id="recordsPerPage" onchange="changeRecordsPerPage()">
+              <option value="3" selected>3</option>
+              <option value="6">6</option>
+              <option value="9">9</option>
+              <option value="12">12</option>
+            </select>
           </div>
-        <% } else { %>
-          <div class="empty-state">
-            <i class="fas fa-book"></i>
-            <h3>No books available</h3>
-            <p>Check back later for new additions to our library collection.</p>
+            
+          <div class="pagination-center"></div>
+            
+          <div class="pagination-right">
+            <label>Go to:</label>
+            <input type="number" id="gotoPage" min="1" max="1" placeholder="1">
+            <button onclick="gotoPage()">Go</button>
           </div>
-        <% } %>
+        </div>
         
         <div id="noResults" class="empty-state" style="display: none;">
           <i class="fas fa-search"></i>
@@ -452,157 +394,316 @@
   <script>
     // Pagination Functions
     function changeRecordsPerPage() {
-      saveScrollPosition();
-      const recordsPerPage = document.getElementById('recordsPerPage').value;
-      const urlParams = new URLSearchParams(window.location.search);
-      urlParams.set('limit', recordsPerPage);
-      urlParams.set('page', '1');
-      window.location.search = urlParams.toString();
+      searchBooks(); // Use backend search with new limit
     }
     
     function gotoPage() {
-      saveScrollPosition();
-      const page = document.getElementById('gotoPage').value;
-      const recordsPerPage = document.getElementById('recordsPerPage').value;
-      if (page && page >= 1 && page <= <%= totalPages || 1 %>) {
-        window.location.href = `?page=${page}&limit=${recordsPerPage}`;
+      const page = parseInt(document.getElementById('gotoPage').value);
+      if (page && page >= 1) {
+        searchBooksPageNumber(page);
       }
     }
-
-    function saveScrollPosition() {
-      const scrollPosition = window.scrollY;
-      sessionStorage.setItem('homeScrollPosition', scrollPosition);
-    }
-
-    // Search and Filter Functionality (now works with pagination)
-    function filterBooks() {
-      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    
+    async function searchBooksPageNumber(page) {
+      const searchTerm = document.getElementById('searchInput').value;
       const categoryFilter = document.getElementById('categoryFilter').value;
       const statusFilter = document.getElementById('statusFilter').value;
       const sortFilter = document.getElementById('sortFilter').value;
-      const currentUser = '<%= user.username %>';
+      const limit = document.getElementById('recordsPerPage').value;
       
-      const bookCards = Array.from(document.querySelectorAll('.book-card'));
-      let visibleBooks = [];
-      
-      bookCards.forEach(card => {
-        const title = card.getAttribute('data-title');
-        const author = card.getAttribute('data-author');
-        const category = card.getAttribute('data-category');
-        const status = card.getAttribute('data-status');
-        const issuedTo = card.getAttribute('data-issued-to');
-        
-        let showCard = true;
-        
-        // Search filter (title or author)
-        if (searchTerm && !title.includes(searchTerm) && !author.includes(searchTerm)) {
-          showCard = false;
-        }
-        
-        // Category filter
-        if (categoryFilter && category !== categoryFilter) {
-          showCard = false;
-        }
-        
-        // Status filter
-        if (statusFilter) {
-          if (statusFilter === 'Available' && status !== 'Available') {
-            showCard = false;
-          } else if (statusFilter === 'Issued' && status !== 'Issued') {
-            showCard = false;
-          } else if (statusFilter === 'My Books' && issuedTo !== currentUser) {
-            showCard = false;
-          }
-        }
-        
-        if (showCard) {
-          card.style.display = 'flex';
-          visibleBooks.push(card);
-        } else {
-          card.style.display = 'none';
-        }
-      });
-      
-      // Sort books
-      if (sortFilter && visibleBooks.length > 0) {
-        visibleBooks.sort((a, b) => {
-          let aValue, bValue;
-          
-          switch (sortFilter) {
-            case 'title':
-              aValue = a.getAttribute('data-title');
-              bValue = b.getAttribute('data-title');
-              break;
-            case 'author':
-              aValue = a.getAttribute('data-author');
-              bValue = b.getAttribute('data-author');
-              break;
-            case 'category':
-              aValue = a.getAttribute('data-category');
-              bValue = b.getAttribute('data-category');
-              break;
-            case 'status':
-              aValue = a.getAttribute('data-status');
-              bValue = b.getAttribute('data-status');
-              break;
-            default:
-              return 0;
-          }
-          
-          return aValue.localeCompare(bValue);
+      try {
+        const params = new URLSearchParams({
+          page: page,
+          limit: limit
         });
         
-        // Reorder DOM elements
-        const container = document.getElementById('booksContainer');
-        visibleBooks.forEach(card => container.appendChild(card));
-      }
-      
-      // Update counters
-      const totalBooks = <%= totalRecords || books.length %>;
-      const visibleCount = visibleBooks.length;
-      
-      document.getElementById('visibleCount').textContent = visibleCount;
-      document.getElementById('totalCount').textContent = totalBooks;
-      
-      // Show/hide no results message
-      const noResults = document.getElementById('noResults');
-      if (visibleCount === 0) {
-        noResults.style.display = 'block';
-      } else {
-        noResults.style.display = 'none';
+        if (searchTerm) params.append('q', searchTerm);
+        if (categoryFilter) params.append('category', categoryFilter);
+        if (statusFilter) params.append('status', statusFilter);
+        if (sortFilter) params.append('sort', sortFilter);
+        
+        const response = await fetch(`/api/search/books?${params}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          updateBooksDisplay(data.books, data.pagination);
+        } else {
+          console.error('Search failed:', data.message);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
       }
     }
-
+    
+    // Backend search functionality
+    let searchTimeout;
+    async function searchBooks() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(async () => {
+        const searchTerm = document.getElementById('searchInput').value;
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+        const sortFilter = document.getElementById('sortFilter').value;
+        const currentPage = 1; // Reset to first page on search
+        const limit = document.getElementById('recordsPerPage')?.value || 3;
+        
+        try {
+          const params = new URLSearchParams({
+            page: currentPage,
+            limit: limit
+          });
+          
+          if (searchTerm) params.append('q', searchTerm);
+          if (categoryFilter) params.append('category', categoryFilter);
+          if (statusFilter) params.append('status', statusFilter);
+          if (sortFilter) params.append('sort', sortFilter);
+          
+          const response = await fetch(`/api/search/books?${params}`);
+          const data = await response.json();
+          
+          if (data.success) {
+            updateBooksDisplay(data.books, data.pagination);
+          } else {
+            console.error('Search failed:', data.message);
+          }
+        } catch (error) {
+          console.error('Search error:', error);
+        }
+      }, 300); // Debounce search by 300ms
+    }
+    
+    function updateBooksDisplay(books, pagination) {
+      const container = document.getElementById('booksContainer');
+      const noResults = document.getElementById('noResults');
+      
+      // Clear existing books
+      container.innerHTML = '';
+      
+      if (books.length === 0) {
+        noResults.style.display = 'block';
+        document.getElementById('visibleCount').textContent = '0';
+        return;
+      }
+      
+      noResults.style.display = 'none';
+      
+      // Add new books
+      books.forEach(book => {
+        const bookCard = document.createElement('div');
+        bookCard.className = 'book-card';
+        bookCard.setAttribute('data-title', book.title.toLowerCase());
+        bookCard.setAttribute('data-author', book.author.toLowerCase());
+        bookCard.setAttribute('data-category', book.category);
+        bookCard.setAttribute('data-status', book.state);
+        bookCard.setAttribute('data-issued-to', book.issuedTo || '');
+        
+        let issuedToHtml = '';
+        if (book.state === 'Issued' && book.issuedTo && book.issuedTo !== '<%= user.username %>') {
+          issuedToHtml = `<p><strong>Issued To:</strong> ${book.issuedTo}</p>`;
+        }
+        
+        let actionButtons = '';
+        if (book.state === 'Available') {
+          actionButtons = `
+            <button type="button" class="btn-issue" onclick="issueBook('${book._id}')">
+              <i class="fas fa-download"></i> Issue
+            </button>
+          `;
+        } else if (book.state === 'Issued' && book.issuedTo === '<%= user.username %>') {
+          actionButtons = `
+            <button type="button" class="btn-return" onclick="returnBook('${book._id}')">
+              <i class="fas fa-upload"></i> Return
+            </button>
+          `;
+        }
+        
+        bookCard.innerHTML = `
+          <h3><i class="fas fa-book"></i> ${book.title}</h3>
+          <p><strong>Author:</strong> ${book.author}</p>
+          <p><strong>Category:</strong> ${book.category}</p>
+          <p><strong>Status:</strong> 
+            <span class="status-badge ${book.state === 'Available' ? 'status-available' : 'status-issued'}">
+              ${book.state}
+            </span>
+          </p>
+          ${issuedToHtml}
+          <div class="book-actions">
+            ${actionButtons}
+          </div>
+        `;
+        
+        container.appendChild(bookCard);
+      });
+      
+      // Update counters
+      document.getElementById('visibleCount').textContent = books.length;
+      document.getElementById('totalCount').textContent = pagination.totalBooks;
+      
+      // Update pagination if needed
+      updatePagination(pagination);
+    }
+    
+    function updatePagination(pagination) {
+      // Update pagination controls
+      const paginationContainer = document.querySelector('.pagination-container');
+      if (paginationContainer && pagination.totalPages > 1) {
+        // Show pagination
+        paginationContainer.style.display = 'flex';
+        
+        // Update Go to Page input max value
+        const gotoPageInput = document.getElementById('gotoPage');
+        if (gotoPageInput) {
+          gotoPageInput.max = pagination.totalPages;
+          gotoPageInput.placeholder = pagination.currentPage;
+        }
+        
+        // Update page numbers and navigation
+        const paginationCenter = paginationContainer.querySelector('.pagination-center');
+        if (paginationCenter) {
+          let paginationHtml = '';
+          
+          // Previous button
+          if (pagination.currentPage > 1) {
+            paginationHtml += `<a href="javascript:void(0)" onclick="searchBooksPageNumber(${pagination.currentPage - 1})" class="pagination-btn">← Prev</a>`;
+          } else {
+            paginationHtml += `<span class="pagination-btn disabled">← Prev</span>`;
+          }
+          
+          // Page numbers
+          const startPage = Math.max(1, pagination.currentPage - 2);
+          const endPage = Math.min(pagination.totalPages, pagination.currentPage + 2);
+          
+          for (let i = startPage; i <= endPage; i++) {
+            const activeClass = i === pagination.currentPage ? 'active' : '';
+            paginationHtml += `<a href="javascript:void(0)" onclick="searchBooksPageNumber(${i})" class="pagination-btn ${activeClass}">${i}</a>`;
+          }
+          
+          // Next button
+          if (pagination.currentPage < pagination.totalPages) {
+            paginationHtml += `<a href="javascript:void(0)" onclick="searchBooksPageNumber(${pagination.currentPage + 1})" class="pagination-btn">Next →</a>`;
+          } else {
+            paginationHtml += `<span class="pagination-btn disabled">Next →</span>`;
+          }
+          
+          paginationCenter.innerHTML = paginationHtml;
+        }
+      } else {
+        // Hide pagination if only one page
+        if (paginationContainer) {
+          paginationContainer.style.display = 'none';
+        }
+      }
+    }
+    
+    async function issueBook(id) {
+      try {
+        // Disable button during request
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Issuing...';
+        
+        const response = await fetch(`/api/issue/${id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage(data.message, 'success');
+          searchBooks(); // Update book list
+        } else {
+          showMessage(data.message, 'error');
+          // Re-enable button on error
+          button.disabled = false;
+          button.innerHTML = originalText;
+        }
+      } catch (error) {
+        console.error('Issue error:', error);
+        showMessage('Error issuing book. Please try again.', 'error');
+        // Re-enable button on error
+        const button = event.target;
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-download"></i> Issue';
+      }
+    }
+    
+    async function returnBook(id) {
+      try {
+        // Disable button during request
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Returning...';
+        
+        const response = await fetch(`/api/return/${id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage(data.message, 'success');
+          searchBooks(); // Update book list
+        } else {
+          showMessage(data.message, 'error');
+          // Re-enable button on error
+          button.disabled = false;
+          button.innerHTML = originalText;
+        }
+      } catch (error) {
+        console.error('Return error:', error);
+        showMessage('Error returning book. Please try again.', 'error');
+        // Re-enable button on error
+        const button = event.target;
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-upload"></i> Return';
+      }
+    }
+    
+    function showMessage(message, type) {
+      // Remove existing messages
+      const existingMessages = document.querySelectorAll('.flash-message');
+      existingMessages.forEach(msg => msg.remove());
+      
+      // Create new message
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `flash flash-${type} flash-message`;
+      messageDiv.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+      
+      // Insert at top of container
+      const container = document.querySelector('.container');
+      const header = container.querySelector('.header');
+      container.insertBefore(messageDiv, header.nextSibling);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        if (messageDiv.parentNode) {
+          messageDiv.remove();
+        }
+      }, 5000);
+    }
+    
     function clearFilters() {
       document.getElementById('searchInput').value = '';
       document.getElementById('categoryFilter').value = '';
       document.getElementById('statusFilter').value = '';
       document.getElementById('sortFilter').value = 'title';
-      filterBooks();
+      searchBooks(); // Use backend search instead of client-side filtering
     }
-
-    // Add click handlers to pagination links to save scroll position
-    document.addEventListener('DOMContentLoaded', function() {
-      const paginationLinks = document.querySelectorAll('.pagination-btn');
-      paginationLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-          if (!this.classList.contains('disabled')) {
-            saveScrollPosition();
-          }
-        });
-      });
-
-      // Restore scroll position after page load
-      const savedScrollPosition = sessionStorage.getItem('homeScrollPosition');
-      if (savedScrollPosition) {
-        window.scrollTo(0, parseInt(savedScrollPosition));
-        sessionStorage.removeItem('homeScrollPosition');
-      }
-
-      <% if (user.role !== 'admin') { %>
-        filterBooks();
-      <% } %>
-    });
+    
+    // Add event listeners for filtering
+    document.getElementById('searchInput').addEventListener('input', searchBooks);
+    document.getElementById('categoryFilter').addEventListener('change', searchBooks);
+    document.getElementById('statusFilter').addEventListener('change', searchBooks);
+    document.getElementById('sortFilter').addEventListener('change', searchBooks);
+    
+    // Initial search
+    searchBooks();
   </script>
 </body>
 </html>

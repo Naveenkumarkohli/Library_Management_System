@@ -388,6 +388,61 @@ app.post("/return", isAuthenticated, async (req, res) => {
   res.redirect("/home");
 });
 
+// AJAX API endpoints for issue/return
+app.post("/api/issue/:id", isAuthenticated, async (req, res) => {
+  try {
+    const book = await Book.findById(req.params.id);
+    if (book && book.state === "Available") {
+      book.state = "Issued";
+      book.issuedTo = req.session.user.username;
+      await book.save();
+      
+      // Log activity
+      const activity = new UserActivity({
+        username: req.session.user.username,
+        bookId: book._id,
+        bookTitle: book.title,
+        action: 'issued'
+      });
+      await activity.save();
+      
+      res.json({ success: true, message: `"${book.title}" has been issued to you.` });
+    } else {
+      res.json({ success: false, message: "Book cannot be issued." });
+    }
+  } catch (error) {
+    console.error("Issue error:", error);
+    res.json({ success: false, message: "Error issuing book." });
+  }
+});
+
+app.post("/api/return/:id", isAuthenticated, async (req, res) => {
+  try {
+    const book = await Book.findById(req.params.id);
+    if (book && book.state === "Issued" && book.issuedTo === req.session.user.username) {
+      book.state = "Available";
+      book.issuedTo = null;
+      await book.save();
+      
+      // Log activity
+      const activity = new UserActivity({
+        username: req.session.user.username,
+        bookId: book._id,
+        bookTitle: book.title,
+        action: 'returned'
+      });
+      await activity.save();
+      
+      res.json({ success: true, message: `"${book.title}" has been returned successfully.` });
+    } else {
+      res.json({ success: false, message: "Book cannot be returned." });
+    }
+  } catch (error) {
+    console.error("Return error:", error);
+    res.json({ success: false, message: "Error returning book." });
+  }
+});
+
 // Admin Books Management
 app.get("/admin/books", isAuthenticated, isAdmin, async (req, res) => {
   try {
@@ -551,6 +606,161 @@ app.get("/admin/user-stats/:userId", isAuthenticated, isAdmin, async (req, res) 
   } catch (error) {
     console.error("Error fetching user stats:", error);
     res.json({ success: false, message: "Error loading user statistics" });
+  }
+});
+
+// Search API endpoints
+app.get("/api/search/books", isAuthenticated, async (req, res) => {
+  try {
+    const { q, category, status, sort, page = 1, limit = 3 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build search query
+    let searchQuery = {};
+    
+    // Text search across title, author, and category
+    if (q && q.trim()) {
+      const searchRegex = new RegExp(q.trim(), 'i');
+      searchQuery.$or = [
+        { title: searchRegex },
+        { author: searchRegex },
+        { category: searchRegex }
+      ];
+    }
+    
+    // Category filter
+    if (category && category !== '') {
+      searchQuery.category = category;
+    }
+    
+    // Status filter
+    if (status && status !== '') {
+      if (status === 'Available') {
+        searchQuery.state = 'Available';
+      } else if (status === 'Issued') {
+        searchQuery.state = 'Issued';
+      } else if (status === 'My Books' && req.session.user.role !== 'admin') {
+        searchQuery.issuedTo = req.session.user.username;
+      }
+    }
+    
+    // Build sort query
+    let sortQuery = { _id: -1 }; // default sort
+    if (sort) {
+      switch (sort) {
+        case 'title':
+          sortQuery = { title: 1 };
+          break;
+        case 'author':
+          sortQuery = { author: 1 };
+          break;
+        case 'category':
+          sortQuery = { category: 1 };
+          break;
+        case 'status':
+          sortQuery = { state: 1 };
+          break;
+      }
+    }
+    
+    // Get books and total count
+    const books = await Book.find(searchQuery)
+      .sort(sortQuery)
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const totalBooks = await Book.countDocuments(searchQuery);
+    const totalPages = Math.ceil(totalBooks / parseInt(limit));
+    
+    res.json({
+      success: true,
+      books,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalBooks,
+        limit: parseInt(limit)
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error searching books:", error);
+    res.json({ success: false, message: "Error searching books" });
+  }
+});
+
+app.get("/api/search/users", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    // Build search query
+    let searchQuery = {};
+    
+    // Text search across username, email, and role
+    if (q && q.trim()) {
+      const searchRegex = new RegExp(q.trim(), 'i');
+      searchQuery.$or = [
+        { username: searchRegex },
+        { email: searchRegex },
+        { role: searchRegex }
+      ];
+    }
+    
+    const users = await User.find(searchQuery).sort({ _id: -1 });
+    
+    res.json({
+      success: true,
+      users
+    });
+    
+  } catch (error) {
+    console.error("Error searching users:", error);
+    res.json({ success: false, message: "Error searching users" });
+  }
+});
+
+app.get("/api/search/admin-books", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { q, page = 1, limit = 3 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build search query
+    let searchQuery = {};
+    
+    // Text search across title, author, category, and status
+    if (q && q.trim()) {
+      const searchRegex = new RegExp(q.trim(), 'i');
+      searchQuery.$or = [
+        { title: searchRegex },
+        { author: searchRegex },
+        { category: searchRegex },
+        { state: searchRegex }
+      ];
+    }
+    
+    // Get books and total count
+    const books = await Book.find(searchQuery)
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const totalBooks = await Book.countDocuments(searchQuery);
+    const totalPages = Math.ceil(totalBooks / parseInt(limit));
+    
+    res.json({
+      success: true,
+      books,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalBooks,
+        limit: parseInt(limit)
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error searching admin books:", error);
+    res.json({ success: false, message: "Error searching books" });
   }
 });
 
