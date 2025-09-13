@@ -35,12 +35,13 @@
     /* Books Grid with Pagination */
     .books-section { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
     .books-header { display: flex; justify-content: between; align-items: center; margin-bottom: 20px; }
-    .books-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto 30px auto; }
+    .books-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto 30px auto; min-height: 460px; }
     .book-card { background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #e9ecef; transition: transform 0.2s, box-shadow 0.2s; height: 220px; display: flex; flex-direction: column; }
     .book-card:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
     .book-card h3 { margin: 0 0 10px 0; color: #333; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .book-info { margin-bottom: 10px; flex-grow: 1; overflow: hidden; }
     .book-info p { margin: 4px 0; color: #666; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .book-info strong { color: #333; }
     .status-badge { display: inline-block; padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
     .status-available { background: #d4edda; color: #155724; }
     .status-issued { background: #f8d7da; color: #721c24; }
@@ -48,20 +49,48 @@
     .btn-delete { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; }
     .btn-delete:hover { background: #c82333; }
     
-    /* Pagination Styles */
-    .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef; }
+    /* Updated Pagination Styles to Match Home Page */
+    .pagination-container { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-top: 30px; 
+      padding: 20px; 
+      background: white; 
+      border-radius: 16px; 
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+      border-top: none;
+    }
     .pagination-left { display: flex; align-items: center; gap: 10px; }
-    .pagination-left label { font-weight: 600; color: #333; }
-    .pagination-left select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; }
+    .pagination-left label { font-weight: 600; color: #4a5568; }
+    .pagination-left select { padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #f7fafc; }
     .pagination-center { display: flex; align-items: center; gap: 8px; }
-    .pagination-btn { padding: 8px 12px; border: 1px solid #ddd; background: white; color: #333; text-decoration: none; border-radius: 6px; font-weight: 500; }
-    .pagination-btn:hover { background: #f8f9fa; }
+    .pagination-btn { 
+      padding: 8px 12px; 
+      border: 2px solid #e2e8f0; 
+      background: white; 
+      color: #4a5568; 
+      text-decoration: none; 
+      border-radius: 8px; 
+      font-weight: 500; 
+      transition: all 0.2s;
+    }
+    .pagination-btn:hover { background: #f7fafc; border-color: #cbd5e0; text-decoration: none; color: #4a5568; }
     .pagination-btn.active { background: #667eea; color: white; border-color: #667eea; }
     .pagination-btn.disabled { opacity: 0.5; pointer-events: none; }
     .pagination-right { display: flex; align-items: center; gap: 10px; }
-    .pagination-right input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; width: 60px; text-align: center; }
-    .pagination-right button { padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-    .pagination-right button:hover { background: #5a6fd8; }
+    .pagination-right input { padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; width: 60px; text-align: center; background: #f7fafc; }
+    .pagination-right button { 
+      padding: 8px 16px; 
+      background: #667eea; 
+      color: white; 
+      border: none; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      font-weight: 600; 
+      transition: all 0.2s;
+    }
+    .pagination-right button:hover { background: #5a6fd8; transform: translateY(-1px); }
     
     .flash { margin-bottom: 20px; padding: 15px; border-radius: 8px; }
     .flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
@@ -215,6 +244,7 @@
 
   <script>
     function changeRecordsPerPage() {
+      saveScrollPosition();
       const recordsPerPage = document.getElementById('recordsPerPage').value;
       const urlParams = new URLSearchParams(window.location.search);
       urlParams.set('limit', recordsPerPage);
@@ -223,12 +253,37 @@
     }
     
     function gotoPage() {
+      saveScrollPosition();
       const page = document.getElementById('gotoPage').value;
       const recordsPerPage = document.getElementById('recordsPerPage').value;
       if (page && page >= 1 && page <= <%= totalPages || 1 %>) {
         window.location.href = `?page=${page}&limit=${recordsPerPage}`;
       }
     }
+
+    function saveScrollPosition() {
+      const scrollPosition = window.scrollY;
+      sessionStorage.setItem('booksScrollPosition', scrollPosition);
+    }
+
+    // Add click handlers to pagination links to save scroll position
+    document.addEventListener('DOMContentLoaded', function() {
+      const paginationLinks = document.querySelectorAll('.pagination-btn');
+      paginationLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+          if (!this.classList.contains('disabled')) {
+            saveScrollPosition();
+          }
+        });
+      });
+
+      // Restore scroll position after page load
+      const savedScrollPosition = sessionStorage.getItem('booksScrollPosition');
+      if (savedScrollPosition) {
+        window.scrollTo(0, parseInt(savedScrollPosition));
+        sessionStorage.removeItem('booksScrollPosition');
+      }
+    });
   </script>
 </body>
 </html>
