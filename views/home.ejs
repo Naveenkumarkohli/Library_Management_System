@@ -74,7 +74,7 @@
     .results-count { font-weight: 600; color: #4a5568; }
     
     /* Books Section */
-    .books-section { margin-bottom: 30px; }
+    .books-section { margin-bottom: 10px; }
     .books-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto; }
     .book-card { 
       background: white; 
@@ -452,6 +452,7 @@
   <script>
     // Pagination Functions
     function changeRecordsPerPage() {
+      saveScrollPosition();
       const recordsPerPage = document.getElementById('recordsPerPage').value;
       const urlParams = new URLSearchParams(window.location.search);
       urlParams.set('limit', recordsPerPage);
@@ -460,11 +461,17 @@
     }
     
     function gotoPage() {
+      saveScrollPosition();
       const page = document.getElementById('gotoPage').value;
       const recordsPerPage = document.getElementById('recordsPerPage').value;
       if (page && page >= 1 && page <= <%= totalPages || 1 %>) {
         window.location.href = `?page=${page}&limit=${recordsPerPage}`;
       }
+    }
+
+    function saveScrollPosition() {
+      const scrollPosition = window.scrollY;
+      sessionStorage.setItem('homeScrollPosition', scrollPosition);
     }
 
     // Search and Filter Functionality (now works with pagination)
@@ -574,28 +581,27 @@
       filterBooks();
     }
 
-    function saveScrollPosition() {
-      const scrollPosition = window.scrollY;
-      document.cookie = `scrollPosition=${scrollPosition}; path=/`;
-    }
-
-    // Event listeners
-    <% if (user.role !== 'admin') { %>
-      document.getElementById('searchInput').addEventListener('input', filterBooks);
-      document.getElementById('categoryFilter').addEventListener('change', filterBooks);
-      document.getElementById('statusFilter').addEventListener('change', filterBooks);
-      document.getElementById('sortFilter').addEventListener('change', filterBooks);
-    <% } %>
-
-    // Initialize on page load
+    // Add click handlers to pagination links to save scroll position
     document.addEventListener('DOMContentLoaded', function() {
+      const paginationLinks = document.querySelectorAll('.pagination-btn');
+      paginationLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+          if (!this.classList.contains('disabled')) {
+            saveScrollPosition();
+          }
+        });
+      });
+
+      // Restore scroll position after page load
+      const savedScrollPosition = sessionStorage.getItem('homeScrollPosition');
+      if (savedScrollPosition) {
+        window.scrollTo(0, parseInt(savedScrollPosition));
+        sessionStorage.removeItem('homeScrollPosition');
+      }
+
       <% if (user.role !== 'admin') { %>
         filterBooks();
       <% } %>
-      const scrollPosition = document.cookie.match(/scrollPosition=([^;]*)/);
-      if (scrollPosition) {
-        window.scrollTo(0, parseInt(scrollPosition[1]));
-      }
     });
   </script>
 </body>

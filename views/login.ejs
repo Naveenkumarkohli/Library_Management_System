@@ -106,8 +106,8 @@
           </div>
           <div class="credential-info">Browse and borrow books from the library</div>
           <div class="credential-data">
-            <strong>Username:</strong> user<br>
-            <strong>Password:</strong> user123
+            <strong>Username:</strong> naveen<br>
+            <strong>Password:</strong> naveen123
           </div>
         </div>
       </div>
@@ -123,8 +123,8 @@
     document.querySelectorAll('.credential-item').forEach(item => {
       item.addEventListener('click', function() {
         const isAdmin = this.classList.contains('credential-item') && !this.classList.contains('user');
-        const username = isAdmin ? 'admin' : 'user';
-        const password = isAdmin ? 'admin123' : 'user123';
+        const username = isAdmin ? 'admin' : 'naveen';
+        const password = isAdmin ? 'admin123' : 'naveen123';
         
         document.getElementById('username').value = username;
         document.getElementById('password').value = password;
